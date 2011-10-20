@@ -3,25 +3,30 @@ var {Application} = require("stick");
 export("app", "init");
 
 var app = Application();
-app.configure("notfound", "error", "static", "params", "mount");
+app.configure("notfound", "error", "static");
 app.static(module.resolve("public"));
-app.mount("/", require("./actions"));
 
 var server;
+var sockets = {};
 var start = function() {
-   print ('starting it', server.addWebsocket);
-   // see https://gist.github.com/555596
    var context = server.getDefaultContext();
-   context.addWebSocket("/websocket", function (socket) {
-      // export socket to let us play with it
-      exports.socket = socket;
-      socket.onmessage = function(m) {
-         print("MESSAGE", m);
+   context.addWebSocket("/ringo-chat", function (socket) {
+      socket.uid = java.util.UUID.randomUUID().toString();
+      socket.onmessage = function(msg) {
+         var message = JSON.parse(msg);
+         for (var uid in sockets) {
+            sockets[uid].send(JSON.stringify(message.data));
+         }
       };
 
       socket.onclose = function() {
-         print("CLOSE");
+         delete sockets[socket.uid];
       };
+      socket.send(JSON.stringify({
+         type: 'hello',
+         uid: socket.uid
+      }));
+      sockets[socket.uid] = socket;
    });
    return;
 };
